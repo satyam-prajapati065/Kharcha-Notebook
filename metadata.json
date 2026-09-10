@@ -1,0 +1,6 @@
+{
+  "name": "Kharcha Notebook",
+  "description": "Personal Monthly Expense & Cash Flow Tracker",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

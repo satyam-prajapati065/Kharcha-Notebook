@@ -1,0 +1,27 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Center group within 66dp safe zone (21 to 87) -->
+    <!-- Wallet base -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,42 C34,39.8 35.8,38 38,38 L70,38 C72.2,38 74,39.8 74,42 L74,70 C74,72.2 72.2,74 70,74 L38,74 C35.8,74 34,72.2 34,70 Z" />
+    <!-- Wallet clasp / flap -->
+    <path
+        android:fillColor="#10B981"
+        android:pathData="M58,50 L75,50 C76.1,50 77,50.9 77,52 L77,60 C77,61.1 76.1,62 75,62 L58,62 C55.8,62 54,60.2 54,58 L54,54 C54,51.8 55.8,50 58,50 Z" />
+    <!-- Clasp pin dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M67,56 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+    <!-- Cash flow arrows: Green In Arrow (top right) -->
+    <path
+        android:fillColor="#34D399"
+        android:pathData="M44,30 L52,30 L52,38 L48,38 L48,34 L40,42 L37,39 L45,31 L41,31 Z" />
+    <!-- Red Out Arrow -->
+    <path
+        android:fillColor="#F87171"
+        android:pathData="M66,30 L74,38 L70,38 L65,33 L65,42 L62,42 L62,33 L58,37 L56,35 Z" />
+</vector>

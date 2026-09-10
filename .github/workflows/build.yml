@@ -26,8 +26,8 @@ jobs:
         run: |
           mkdir -p ~/.android
           
-          # Generate production release keystore
-          keytool -genkeypair -v -keystore my-upload-key.jks -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Satyam Prajapati, OU=KharchaNotebook, O=Developer, L=Delhi, ST=Delhi, C=IN"
+          # Generate production release keystore with alias 'key0' and standard credentials
+          keytool -genkeypair -v -keystore my-upload-key.jks -alias key0 -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Satyam Prajapati, OU=KharchaNotebook, O=Developer, L=Delhi, ST=Delhi, C=IN"
           cp my-upload-key.jks app/my-upload-key.jks || true
           cp my-upload-key.jks ./release.keystore || true
 
@@ -35,11 +35,26 @@ jobs:
           keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           cp ~/.android/debug.keystore ./debug.keystore || true
 
-          # Dummy Google Services with exact Kharcha Notebook package name
+          # Google Services config for Kharcha Notebook
           echo '{"project_info":{"project_number":"123","project_id":"kharcha-notebook"},"client":[{"client_info":{"mobilesdk_app_id":"1:123:android:123","android_client_info":{"package_name":"com.aistudio.cashflow.wrtkpy"}},"api_key":[{"current_key":"AIzaSyDummy"}]}]}' > app/google-services.json
 
       - name: Build Release APK
-        run: gradle assembleRelease -x test -x lint -x lintVitalRelease
+        env:
+          KEYSTORE_PASSWORD: android
+          KEY_PASSWORD: android
+          STORE_PASSWORD: android
+          KEY_ALIAS: key0
+        run: |
+          gradle assembleRelease \
+            -Pandroid.injected.signing.store.file=$(pwd)/my-upload-key.jks \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=key0 \
+            -Pandroid.injected.signing.key.password=android \
+            -PstorePassword=android \
+            -PkeyPassword=android \
+            -PkeyAlias=key0 \
+            -PstoreFile=$(pwd)/my-upload-key.jks \
+            -x test -x lint -x lintVitalRelease
 
       - name: Upload Signed Release APK
         uses: actions/upload-artifact@v4

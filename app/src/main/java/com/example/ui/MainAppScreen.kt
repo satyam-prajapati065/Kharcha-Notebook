@@ -3,6 +3,7 @@ package com.example.ui
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -315,6 +316,11 @@ fun MainDashboard(
     var selectedBudgetCategoryForDialog by remember { mutableStateOf<String?>(null) }
     var detailTransaction by remember { mutableStateOf<TransactionEntity?>(null) }
     var editTransaction by remember { mutableStateOf<TransactionEntity?>(null) }
+
+    // Intercept back button to navigate to Home tab if on another tab
+    BackHandler(enabled = selectedTab != 0) {
+        selectedTab = 0
+    }
 
     // Observed States from ViewModel
     val currentMonth by viewModel.currentMonthYear.collectAsStateWithLifecycle()

@@ -56,6 +56,10 @@ import com.example.data.UserPreferencesManager
 import com.example.ui.components.KharchaAppLogo
 import java.io.File
 
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+
 @Composable
 fun ProfileSetupScreen(
     userPreferencesManager: UserPreferencesManager,
@@ -67,15 +71,35 @@ fun ProfileSetupScreen(
     var photoPath by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    val cropImageLauncher = rememberLauncherForActivityResult(CropImageContract()) { result ->
+        if (result.isSuccessful) {
+            val uriContent = result.uriContent
+            if (uriContent != null) {
+                val savedPath = userPreferencesManager.savePhotoLocally(uriContent)
+                if (savedPath != null) {
+                    photoPath = savedPath
+                    errorMessage = null
+                }
+            }
+        }
+    }
+
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            val savedPath = userPreferencesManager.savePhotoLocally(uri)
-            if (savedPath != null) {
-                photoPath = savedPath
-                errorMessage = null
-            }
+            cropImageLauncher.launch(
+                CropImageContractOptions(
+                    uri = uri,
+                    cropImageOptions = CropImageOptions(
+                        imageSourceIncludeGallery = false,
+                        imageSourceIncludeCamera = false,
+                        fixAspectRatio = true,
+                        aspectRatioX = 1,
+                        aspectRatioY = 1
+                    )
+                )
+            )
         }
     }
 

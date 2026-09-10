@@ -550,14 +550,34 @@ fun EditProfilePage(
     var photoPath by remember(currentPhoto) { mutableStateOf(currentPhoto) }
     var isSaved by remember { mutableStateOf(false) }
 
+    val cropImageLauncher = rememberLauncherForActivityResult(com.canhub.cropper.CropImageContract()) { result ->
+        if (result.isSuccessful) {
+            val uriContent = result.uriContent
+            if (uriContent != null) {
+                val savedPath = userPreferencesManager.savePhotoLocally(uriContent)
+                if (savedPath != null) {
+                    photoPath = savedPath
+                }
+            }
+        }
+    }
+
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            val savedPath = userPreferencesManager.savePhotoLocally(uri)
-            if (savedPath != null) {
-                photoPath = savedPath
-            }
+            cropImageLauncher.launch(
+                com.canhub.cropper.CropImageContractOptions(
+                    uri = uri,
+                    cropImageOptions = com.canhub.cropper.CropImageOptions(
+                        imageSourceIncludeGallery = false,
+                        imageSourceIncludeCamera = false,
+                        fixAspectRatio = true,
+                        aspectRatioX = 1,
+                        aspectRatioY = 1
+                    )
+                )
+            )
         }
     }
 

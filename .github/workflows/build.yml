@@ -1,9 +1,7 @@
-name: Build Kharcha Notebook APK
+name: Build Kharcha Notebook Signed Release APK
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ "main" ]
 
 jobs:
   build:
@@ -22,17 +20,36 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Setup Keystore & Configs
+      - name: Generate JKS Keystore in all project locations
         run: |
           mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          cp ~/.android/debug.keystore ./debug.keystore || true
+          # Generate standard release keystore for Kharcha Notebook
+          keytool -genkeypair -v -keystore my-upload-key.jks -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Satyam Prajapati, OU=KharchaNotebook, O=Developer, L=Delhi, ST=Delhi, C=IN"
+          
+          # Copy to app folder and debug keystore location
+          cp my-upload-key.jks app/my-upload-key.jks || true
+          cp my-upload-key.jks ~/.android/debug.keystore || true
 
-      - name: Build Debug APK
-        run: gradle assembleDebug -x test -x lint
+          # Create dummy google-services.json if required by plugins
+          echo '{"project_info":{"project_number":"123","project_id":"kharchanotebook"},"client":[{"client_info":{"mobilesdk_app_id":"1:123:android:123","android_client_info":{"package_name":"com.example.kharchanotebook"}},"api_key":[{"current_key":"AIzaSyDummy"}]}]}' > app/google-services.json
 
-      - name: Upload APK
+      - name: Build Release APK with Injected Signing Properties
+        run: |
+          gradle assembleRelease \
+            -Pandroid.injected.signing.store.file=$(pwd)/my-upload-key.jks \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=my-key-alias \
+            -Pandroid.injected.signing.key.password=android \
+            -PKEYSTORE_PASSWORD=android \
+            -PKEY_PASSWORD=android \
+            -PKEY_ALIAS=my-key-alias \
+            -PMYAPP_UPLOAD_STORE_PASSWORD=android \
+            -PMYAPP_UPLOAD_KEY_PASSWORD=android \
+            -PMYAPP_UPLOAD_KEY_ALIAS=my-key-alias \
+            -x test -x lint -x lintVitalRelease
+
+      - name: Upload Signed Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: Kharcha-Notebook-APK
-          path: app/build/outputs/apk/debug/*.apk
+          name: KharchaNotebook-Signed-Release-APK
+          path: app/build/outputs/apk/release/*.apk

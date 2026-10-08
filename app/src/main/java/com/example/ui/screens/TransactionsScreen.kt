@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FilterList
@@ -34,8 +36,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.TransactionEntity
@@ -60,6 +64,7 @@ fun TransactionsScreen(
 ) {
     val totalFilteredIn = transactions.filter { it.type == "IN" }.sumOf { it.amount }
     val totalFilteredOut = transactions.filter { it.type == "OUT" }.sumOf { it.amount }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     LazyColumn(
         modifier = modifier
@@ -116,6 +121,8 @@ fun TransactionsScreen(
                 },
                 shape = RoundedCornerShape(14.dp),
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("transactions_search_input")

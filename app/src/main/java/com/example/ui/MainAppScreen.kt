@@ -345,9 +345,8 @@ fun MainDashboard(
         modifier = modifier.fillMaxSize(),
         bottomBar = {
             NavigationBar(
-                modifier = Modifier
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .testTag("bottom_nav_bar"),
+                modifier = Modifier.testTag("bottom_nav_bar"),
+                windowInsets = WindowInsets.navigationBars,
                 containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp
             ) {

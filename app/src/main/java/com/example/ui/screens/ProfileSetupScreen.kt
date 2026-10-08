@@ -46,6 +46,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -104,6 +106,8 @@ fun ProfileSetupScreen(
     }
 
     val scrollState = rememberScrollState()
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
     Column(
         modifier = modifier
@@ -291,6 +295,8 @@ fun ProfileSetupScreen(
         // Continue Button
         Button(
             onClick = {
+                keyboardController?.hide()
+                focusManager.clearFocus()
                 if (name.isBlank()) {
                     errorMessage = "Please enter your name"
                     return@Button

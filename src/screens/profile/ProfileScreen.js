@@ -251,7 +251,7 @@ export const ProfileScreen = ({ navigation }) => {
         <Card style={styles.settingsCard}>
           <View style={[styles.aboutRow, { borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
             <Text style={[styles.aboutLabel, { color: theme.textSecondary }]}>App Version</Text>
-            <Text style={[styles.aboutVal, { color: theme.text }]}>1.0.0</Text>
+            <Text style={[styles.aboutVal, { color: theme.text }]}>1.1.0</Text>
           </View>
           <View style={[styles.aboutRow, { borderBottomColor: theme.border, borderBottomWidth: StyleSheet.hairlineWidth }]}>
             <Text style={[styles.aboutLabel, { color: theme.textSecondary }]}>About the App</Text>

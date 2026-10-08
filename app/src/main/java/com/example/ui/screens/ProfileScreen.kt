@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.BuildConfig
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -84,8 +85,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -566,7 +565,7 @@ fun ProfileMainPage(
                 SettingsNavigationItem(
                     icon = Icons.Default.Info,
                     title = "About Kharcha Notebook",
-                    subtitle = "Version 1.0.0 • Privacy Policy • Terms",
+                    subtitle = "Version ${BuildConfig.VERSION_NAME} • Privacy Policy • Terms",
                     onClick = onNavigateToAbout,
                     tag = "setting_about"
                 )
@@ -832,15 +831,6 @@ fun EditProfilePage(
         }
     }
 
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusManager = LocalFocusManager.current
-
-    val handleBack: () -> Unit = {
-        keyboardController?.hide()
-        focusManager.clearFocus()
-        onBack()
-    }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -853,7 +843,7 @@ fun EditProfilePage(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = handleBack) {
+            IconButton(onClick = onBack) {
                 Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -947,8 +937,6 @@ fun EditProfilePage(
 
             Button(
                 onClick = {
-                    keyboardController?.hide()
-                    focusManager.clearFocus()
                     userPreferencesManager.updateProfile(name = name.trim(), photoPath = photoPath)
                     Toast.makeText(context, "Profile updated successfully!", Toast.LENGTH_SHORT).show()
                     onBack()
@@ -1539,7 +1527,7 @@ fun AboutPage(
             )
 
             Text(
-                text = "Version 1.0.0",
+                text = "Version ${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

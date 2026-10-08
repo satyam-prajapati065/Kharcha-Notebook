@@ -38,7 +38,6 @@ export const HomeScreen = ({ navigation }) => {
     savings,
     savingsRate,
     recentTransactions,
-    insights,
   } = dashboardData;
 
   const userName = user?.name ? user.name.split(' ')[0] : 'User';
@@ -142,21 +141,6 @@ export const HomeScreen = ({ navigation }) => {
             subtitle={`Savings Rate: ${savingsRate}%`}
           />
         </View>
-
-        {/* Financial Insights Banner */}
-        {insights && insights.length > 0 && (
-          <Card style={[styles.insightsCard, { backgroundColor: theme.primaryLight + '30', borderColor: theme.primary }]}>
-            <View style={styles.insightsHeader}>
-              <Text style={styles.insightIcon}>💡</Text>
-              <Text style={[styles.insightTitle, { color: theme.primary }]}>
-                Monthly Financial Insight
-              </Text>
-            </View>
-            <Text style={[styles.insightText, { color: theme.text }]}>
-              {insights[0]}
-            </Text>
-          </Card>
-        )}
 
         {/* Recent Transactions Section */}
         <View style={styles.sectionHeader}>
@@ -268,29 +252,6 @@ const styles = StyleSheet.create({
   halfRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  insightsCard: {
-    padding: 14,
-    marginVertical: 10,
-  },
-  insightsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  insightIcon: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  insightTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  insightText: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '500',
   },
   sectionHeader: {
     flexDirection: 'row',

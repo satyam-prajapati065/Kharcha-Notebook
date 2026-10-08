@@ -21,12 +21,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Warning
@@ -63,7 +60,6 @@ import com.example.ui.theme.CashInGreen
 import com.example.ui.theme.CashInGreenBg
 import com.example.ui.theme.CashOutRed
 import com.example.ui.theme.CashOutRedBg
-import com.example.ui.theme.WarningOrange
 
 @Composable
 fun HomeScreen(
@@ -81,7 +77,6 @@ fun HomeScreen(
     onTransactionClick: (TransactionEntity) -> Unit,
     onOpenProfile: () -> Unit = {},
     onOpenBudgets: () -> Unit = {},
-    onOpenAiAssistant: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -114,41 +109,15 @@ fun HomeScreen(
                     )
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // AI Voice Assistant Top Action
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(Color(0xFF6366F1), Color(0xFFEC4899), Color(0xFFF59E0B))
-                                )
-                            )
-                            .clickable { onOpenAiAssistant() }
-                            .testTag("home_top_ai_voice_btn"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "AI Voice Entry",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    // Profile Avatar (Clickable to open settings)
-                    UserProfileAvatar(
-                        photoPath = userPhotoPath,
-                        name = userName,
-                        size = 46.dp,
-                        modifier = Modifier
-                            .clickable { onOpenProfile() }
-                            .testTag("profile_avatar_button")
-                    )
-                }
+                // Profile Avatar (Clickable to open settings)
+                UserProfileAvatar(
+                    photoPath = userPhotoPath,
+                    name = userName,
+                    size = 46.dp,
+                    modifier = Modifier
+                        .clickable { onOpenProfile() }
+                        .testTag("profile_avatar_button")
+                )
             }
         }
 
@@ -224,87 +193,6 @@ fun HomeScreen(
                     Icon(imageVector = Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(text = "Cash Out", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                }
-            }
-        }
-
-        // AI Voice Entry Banner Card
-        item {
-            Card(
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                ),
-                border = BorderStroke(
-                    1.2.dp,
-                    Brush.horizontalGradient(
-                        listOf(Color(0xFF6366F1), Color(0xFFEC4899), Color(0xFF10B981))
-                    )
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpenAiAssistant() }
-                    .testTag("home_ai_voice_card")
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(Color(0xFF6366F1), Color(0xFFEC4899))
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "AI Voice Entry",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "AI Voice Entry",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = Color(0xFF6366F1)
-                            ) {
-                                Text(
-                                    text = "GEMINI AI",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        Text(
-                            text = "बोलकर Cash In ya Cash Out करें (उदा: '₹500 petrol UPI')",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
                 }
             }
         }

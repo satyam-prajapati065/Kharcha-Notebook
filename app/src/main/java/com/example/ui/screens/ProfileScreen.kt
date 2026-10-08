@@ -564,7 +564,7 @@ fun ProfileMainPage(
                 SettingsNavigationItem(
                     icon = Icons.Default.Info,
                     title = "About Kharcha Notebook",
-                    subtitle = "Version ${com.example.BuildConfig.VERSION_NAME} • Privacy Policy • Terms",
+                    subtitle = "Version 1.0.0 • Privacy Policy • Terms",
                     onClick = onNavigateToAbout,
                     tag = "setting_about"
                 )
@@ -1526,7 +1526,7 @@ fun AboutPage(
             )
 
             Text(
-                text = "Version ${com.example.BuildConfig.VERSION_NAME}",
+                text = "Version 1.0.0",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

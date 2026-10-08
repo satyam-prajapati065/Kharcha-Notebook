@@ -25,10 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Analytics
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ReceiptLong
@@ -76,7 +74,6 @@ import com.example.notifications.KharchaNotificationScheduler
 import com.example.ui.components.CurrencyFormatter
 import com.example.ui.dialogs.AddBudgetDialog
 import com.example.ui.dialogs.AddTransactionDialog
-import com.example.ui.dialogs.AiVoiceAssistantDialog
 import com.example.ui.dialogs.EditTransactionDialog
 import com.example.ui.dialogs.TransactionDetailDialog
 import com.example.ui.screens.AnalyticsScreen
@@ -313,7 +310,6 @@ fun MainDashboard(
     var selectedTab by remember { mutableIntStateOf(0) }
 
     // Dialog States
-    var showAiVoiceDialog by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
     var addDialogInitialType by remember { mutableStateOf("OUT") }
     var showAddBudgetDialog by remember { mutableStateOf(false) }
@@ -419,42 +415,21 @@ fun MainDashboard(
         },
         floatingActionButton = {
             if (selectedTab != 4) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                FloatingActionButton(
+                    onClick = {
+                        addDialogInitialType = "OUT"
+                        showAddDialog = true
+                    },
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = Color.White,
+                    modifier = Modifier.testTag("main_add_fab")
                 ) {
-                    // AI Voice Assistant FAB
-                    FloatingActionButton(
-                        onClick = { showAiVoiceDialog = true },
-                        shape = CircleShape,
-                        containerColor = Color(0xFF6366F1),
-                        contentColor = Color.White,
-                        modifier = Modifier.testTag("main_ai_voice_fab")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "AI Voice Entry",
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    // Quick Add FAB
-                    FloatingActionButton(
-                        onClick = {
-                            addDialogInitialType = "OUT"
-                            showAddDialog = true
-                        },
-                        shape = CircleShape,
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White,
-                        modifier = Modifier.testTag("main_add_fab")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Transaction",
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add Transaction",
+                        modifier = Modifier.size(26.dp)
+                    )
                 }
             }
         }
@@ -486,8 +461,7 @@ fun MainDashboard(
                     onSeeAllTransactions = { selectedTab = 1 },
                     onTransactionClick = { item -> detailTransaction = item },
                     onOpenProfile = { selectedTab = 4 },
-                    onOpenBudgets = { selectedTab = 3 },
-                    onOpenAiAssistant = { showAiVoiceDialog = true }
+                    onOpenBudgets = { selectedTab = 3 }
                 )
 
                 1 -> TransactionsScreen(
@@ -607,27 +581,6 @@ fun MainDashboard(
                 editTransaction = toEdit
             },
             onDelete = { id -> viewModel.deleteTransaction(id) }
-        )
-    }
-
-    // AI Voice Assistant Dialog
-    if (showAiVoiceDialog) {
-        AiVoiceAssistantDialog(
-            expenseCategories = expenseCategoryNames,
-            incomeCategories = incomeCategoryNames,
-            onDismiss = { showAiVoiceDialog = false },
-            onSaveTransaction = { type, amount, category, paymentMode, note ->
-                viewModel.addTransaction(
-                    type = type,
-                    amount = amount,
-                    category = category,
-                    paymentMode = paymentMode,
-                    note = note
-                )
-            },
-            onSetBudget = { category, limit ->
-                viewModel.setBudget(category, limit)
-            }
         )
     }
 }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.BudgetEntity
+import com.example.data.CategoryEntity
 import com.example.data.KharchaRepository
 import com.example.data.TransactionEntity
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,11 +56,30 @@ class KharchaViewModel(private val repository: KharchaRepository) : ViewModel() 
     private val _selectedFilter = MutableStateFlow("ALL") // "ALL", "IN", "OUT"
     val selectedFilter: StateFlow<String> = _selectedFilter.asStateFlow()
 
+    // Category flows
+    val allCategories: StateFlow<List<CategoryEntity>> =
+        repository.getAllCategories()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val expenseCategories: StateFlow<List<CategoryEntity>> =
+        repository.getCategoriesByType("EXPENSE")
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val incomeCategories: StateFlow<List<CategoryEntity>> =
+        repository.getCategoriesByType("INCOME")
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         viewModelScope.launch {
             repository.cleanupDuplicateBudgets()
+            repository.seedDefaultCategoriesIfEmpty()
             repository.seedInitialDataIfEmpty(_currentMonthYear.value)
             repository.cleanupDuplicateBudgets()
+        }
+        viewModelScope.launch {
+            repository.getAllCategories().collect { list ->
+                com.example.ui.components.CategoryIconHelper.registerCategories(list)
+            }
         }
     }
 
@@ -227,6 +247,49 @@ class KharchaViewModel(private val repository: KharchaRepository) : ViewModel() 
         viewModelScope.launch {
             repository.deleteBudgetById(id)
         }
+    }
+
+    fun addCustomCategory(
+        name: String,
+        type: String, // "EXPENSE" or "INCOME"
+        iconName: String,
+        colorHex: String,
+        onComplete: (success: Boolean, errorMsg: String?) -> Unit
+    ) {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) {
+            onComplete(false, "Category name cannot be empty")
+            return
+        }
+
+        viewModelScope.launch {
+            val existing = repository.findCategoryByNameAndType(trimmed, type)
+            if (existing != null) {
+                onComplete(false, "Category '$trimmed' already exists for ${if (type == "EXPENSE") "Expenses" else "Income"}")
+                return@launch
+            }
+
+            val entity = CategoryEntity(
+                name = trimmed,
+                type = type,
+                iconName = iconName,
+                colorHex = colorHex,
+                isCustom = true
+            )
+            repository.insertCategory(entity)
+            com.example.ui.components.CategoryIconHelper.registerCategory(trimmed, iconName, colorHex)
+            onComplete(true, null)
+        }
+    }
+
+    fun deleteCustomCategory(id: Long) {
+        viewModelScope.launch {
+            repository.deleteCustomCategoryById(id)
+        }
+    }
+
+    suspend fun getAllTransactionsList(): List<TransactionEntity> {
+        return repository.getAllTransactionsList()
     }
 }
 

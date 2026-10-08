@@ -46,13 +46,15 @@ fun AddBudgetDialog(
     onDismiss: () -> Unit,
     onSave: (category: String, limit: Double) -> Unit,
     initialCategory: String? = null,
-    existingLimitMap: Map<String, Double> = emptyMap()
+    existingLimitMap: Map<String, Double> = emptyMap(),
+    availableCategories: List<String> = emptyList()
 ) {
-    val categories = listOf(
+    val defaultCategories = listOf(
         "Groceries", "Food & Dining", "Shopping", "Bills & Utilities",
-        "Rent", "Transport", "Health", "Entertainment", "Education", "Others"
+        "Rent", "Transport", "Health", "Entertainment", "Education", "Other Expense"
     )
-    var selectedCategory by remember { mutableStateOf(initialCategory ?: categories.first()) }
+    val categories = if (availableCategories.isNotEmpty()) availableCategories else defaultCategories
+    var selectedCategory by remember(categories) { mutableStateOf(initialCategory ?: categories.first()) }
     var limitText by remember {
         val initialLimit = existingLimitMap[selectedCategory]
         mutableStateOf(if (initialLimit != null && initialLimit > 0) {

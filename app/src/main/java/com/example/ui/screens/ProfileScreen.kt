@@ -1,7 +1,10 @@
 package com.example.ui.screens
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -25,29 +28,36 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +65,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -64,6 +75,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,11 +89,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.data.CURRENCY_OPTIONS
+import com.example.data.CategoryEntity
+import com.example.data.KharchaDatabase
 import com.example.data.UserPreferencesManager
+import com.example.ui.KharchaViewModel
+import com.example.ui.components.CategoryIconHelper
 import com.example.ui.components.CurrencyFormatter
 import com.example.ui.components.KharchaAppLogo
+import com.example.ui.dialogs.AddCategoryDialog
+import com.example.util.CsvExportHelper
+import com.example.util.ExportResult
+import kotlinx.coroutines.launch
 import java.io.File
 
 enum class ProfileSubPage {
@@ -98,7 +120,8 @@ fun ProfileScreen(
     userPreferencesManager: UserPreferencesManager,
     onBack: () -> Unit,
     onNavigateToBudget: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: KharchaViewModel? = null
 ) {
     var currentSubPage by remember { mutableStateOf(ProfileSubPage.MAIN) }
 
@@ -113,7 +136,8 @@ fun ProfileScreen(
                 onNavigateToCategories = { currentSubPage = ProfileSubPage.CATEGORIES },
                 onNavigateToBudget = onNavigateToBudget,
                 onNavigateToAbout = { currentSubPage = ProfileSubPage.ABOUT },
-                modifier = modifier
+                modifier = modifier,
+                viewModel = viewModel
             )
         }
         ProfileSubPage.EDIT_PROFILE -> {
@@ -139,6 +163,7 @@ fun ProfileScreen(
         }
         ProfileSubPage.CATEGORIES -> {
             CategoriesPage(
+                viewModel = viewModel,
                 onBack = { currentSubPage = ProfileSubPage.MAIN },
                 modifier = modifier
             )
@@ -162,9 +187,11 @@ fun ProfileMainPage(
     onNavigateToCategories: () -> Unit,
     onNavigateToBudget: () -> Unit,
     onNavigateToAbout: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: KharchaViewModel? = null
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val userName by userPreferencesManager.userName.collectAsState()
     val profilePhoto by userPreferencesManager.profilePhoto.collectAsState()
     val selectedCurrency by userPreferencesManager.selectedCurrency.collectAsState()
@@ -174,6 +201,108 @@ fun ProfileMainPage(
     val monthlySummary by userPreferencesManager.monthlySummary.collectAsState()
 
     var showClearDataConfirm by remember { mutableStateOf(false) }
+
+    // Export CSV state & logic
+    var isExporting by remember { mutableStateOf(false) }
+    var exportSuccessResult by remember { mutableStateOf<ExportResult.Success?>(null) }
+    var showExportSuccessDialog by remember { mutableStateOf(false) }
+    var currentExportCsvData by remember { mutableStateOf<String?>(null) }
+
+    // SAF Document Creator for saving to user-chosen location
+    val saveAsDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument(CsvExportHelper.CSV_MIME_TYPE)
+    ) { uri ->
+        if (uri != null && currentExportCsvData != null) {
+            val success = CsvExportHelper.writeToSafUri(context, uri, currentExportCsvData!!)
+            if (success) {
+                Toast.makeText(context, "Saved to chosen location successfully!", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Failed to write CSV to selected location.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    // Actual export execution
+    val executeExport = {
+        coroutineScope.launch {
+            isExporting = true
+            try {
+                val transactions = viewModel?.getAllTransactionsList()
+                    ?: KharchaDatabase.getDatabase(context).transactionDao().getAllTransactionsList()
+
+                val fileName = CsvExportHelper.generateFileName()
+                val csv = CsvExportHelper.generateCsv(transactions)
+                currentExportCsvData = csv
+
+                val result = CsvExportHelper.exportToPublicDownloads(
+                    context = context,
+                    fileName = fileName,
+                    csvContent = csv,
+                    transactionCount = transactions.size
+                )
+
+                when (result) {
+                    is ExportResult.Success -> {
+                        exportSuccessResult = result
+                        showExportSuccessDialog = true
+                        Toast.makeText(
+                            context,
+                            "CSV saved directly to Downloads: $fileName",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    is ExportResult.Error -> {
+                        Toast.makeText(
+                            context,
+                            "Export failed: ${result.errorMessage}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(
+                    context,
+                    "Error during export: ${e.localizedMessage}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                isExporting = false
+            }
+        }
+    }
+
+    // Storage permission launcher for Android 9 (API 28) and below
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            executeExport()
+        } else {
+            Toast.makeText(
+                context,
+                "Storage permission is required to save to Downloads on Android 9 or below.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    val onExportClicked = {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (!hasPermission) {
+                storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            } else {
+                executeExport()
+            }
+        } else {
+            executeExport()
+        }
+    }
 
     val scrollState = rememberScrollState()
 
@@ -387,54 +516,6 @@ fun ProfileMainPage(
                         checked = monthlySummary,
                         onCheckedChange = { userPreferencesManager.setMonthlySummary(it) }
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                com.example.notifications.KharchaNotificationHelper.sendTestReminder(context, isMonthly = false)
-                                Toast.makeText(context, "Test Daily 7 AM notification sent!", Toast.LENGTH_SHORT).show()
-                            }
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.NotificationsActive,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column {
-                                Text(
-                                    text = "Send Test Reminder",
-                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Tap to test daily 7 AM notification now",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
                 }
             }
 
@@ -451,9 +532,11 @@ fun ProfileMainPage(
                     SettingsNavigationItem(
                         icon = Icons.Default.FileDownload,
                         title = "Export Transactions (CSV)",
-                        subtitle = "Save spreadsheet to device",
+                        subtitle = if (isExporting) "Exporting to Downloads..." else "Save spreadsheet to public Downloads",
                         onClick = {
-                            Toast.makeText(context, "Exported transactions to CSV successfully!", Toast.LENGTH_SHORT).show()
+                            if (!isExporting) {
+                                onExportClicked()
+                            }
                         },
                         tag = "setting_export"
                     )
@@ -481,7 +564,7 @@ fun ProfileMainPage(
                 SettingsNavigationItem(
                     icon = Icons.Default.Info,
                     title = "About Kharcha Notebook",
-                    subtitle = "Version 1.0.0 • Privacy Policy • Terms",
+                    subtitle = "Version ${com.example.BuildConfig.VERSION_NAME} • Privacy Policy • Terms",
                     onClick = onNavigateToAbout,
                     tag = "setting_about"
                 )
@@ -509,6 +592,172 @@ fun ProfileMainPage(
                 )
             }
         }
+    }
+
+    if (isExporting) {
+        AlertDialog(
+            onDismissRequest = {},
+            confirmButton = {},
+            icon = {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(36.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = {
+                Text(
+                    text = "Exporting Transactions...",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = "Generating CSV and saving directly to your Downloads folder...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        )
+    }
+
+    if (showExportSuccessDialog && exportSuccessResult != null) {
+        val result = exportSuccessResult!!
+        AlertDialog(
+            onDismissRequest = { showExportSuccessDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = Color(0xFF2E7D32),
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Export Successful!",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Your transaction spreadsheet has been saved directly to your phone's public Downloads folder:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = result.fileName,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Location: ${result.filePathDisplay}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "${result.transactionCount} transactions exported",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "Quick Actions:",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                CsvExportHelper.shareCsv(
+                                    context = context,
+                                    fileUri = result.shareableUri ?: result.mediaUri,
+                                    fileName = result.fileName
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Share CSV", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                CsvExportHelper.openCsv(
+                                    context = context,
+                                    fileUri = result.shareableUri ?: result.mediaUri
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Open File", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            saveAsDocumentLauncher.launch(result.fileName)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Save As Custom Location (SAF)...", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showExportSuccessDialog = false },
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Done")
+                }
+            }
+        )
     }
 
     if (showClearDataConfirm) {
@@ -923,86 +1172,308 @@ fun ThemeOptionRow(
 @Composable
 fun CategoriesPage(
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: KharchaViewModel? = null
 ) {
-    val expenseCategories = listOf("Food & Dining", "Groceries", "Rent", "Transport", "Shopping", "Bills & Utilities", "Health", "Other")
-    val incomeCategories = listOf("Salary", "Freelance", "Business", "Investment", "Gift", "Other")
+    val context = LocalContext.current
+    var showAddCategoryDialog by remember { mutableStateOf(false) }
+    var categoryToDelete by remember { mutableStateOf<CategoryEntity?>(null) }
+    var selectedTypeFilter by remember { mutableStateOf("ALL") } // "ALL", "EXPENSE", "INCOME"
 
-    Column(
+    val expenseCategories by (viewModel?.expenseCategories ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsStateWithLifecycle()
+    val incomeCategories by (viewModel?.incomeCategories ?: kotlinx.coroutines.flow.MutableStateFlow(emptyList())).collectAsStateWithLifecycle()
+
+    Scaffold(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            .background(MaterialTheme.colorScheme.background),
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showAddCategoryDialog = true },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.testTag("add_custom_category_fab")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Add Category",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
             }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Categories",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onBackground
-            )
         }
-
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState())
+                .padding(innerPadding)
         ) {
-            SectionHeader(title = "Expense Categories")
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth()
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    expenseCategories.forEach { cat ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(text = "🔴", fontSize = 12.sp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(text = cat, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
-                        }
+                IconButton(onClick = onBack) {
+                    Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = "Expense & Income Categories",
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "Manage and customize your financial tags",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Type Filter Chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf(
+                    "ALL" to "All Categories",
+                    "EXPENSE" to "Expenses",
+                    "INCOME" to "Income"
+                ).forEach { (key, label) ->
+                    val isSelected = selectedTypeFilter == key
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { selectedTypeFilter = key }
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            SectionHeader(title = "Income Categories")
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    incomeCategories.forEach { cat ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(text = "🟢", fontSize = 12.sp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(text = cat, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                if (selectedTypeFilter == "ALL" || selectedTypeFilter == "EXPENSE") {
+                    SectionHeader(title = "Expense Categories (${expenseCategories.size})")
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            if (expenseCategories.isEmpty()) {
+                                Text(
+                                    text = "No expense categories found",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            } else {
+                                expenseCategories.forEachIndexed { index, cat ->
+                                    CategoryRowItem(
+                                        category = cat,
+                                        onDelete = { categoryToDelete = cat }
+                                    )
+                                    if (index < expenseCategories.size - 1) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = 8.dp),
+                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                        )
+                                    }
+                                }
+                            }
                         }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                if (selectedTypeFilter == "ALL" || selectedTypeFilter == "INCOME") {
+                    SectionHeader(title = "Income Categories (${incomeCategories.size})")
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            if (incomeCategories.isEmpty()) {
+                                Text(
+                                    text = "No income categories found",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            } else {
+                                incomeCategories.forEachIndexed { index, cat ->
+                                    CategoryRowItem(
+                                        category = cat,
+                                        onDelete = { categoryToDelete = cat }
+                                    )
+                                    if (index < incomeCategories.size - 1) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = 8.dp),
+                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                Spacer(modifier = Modifier.height(80.dp)) // Padding for FAB
+            }
+        }
+    }
+
+    if (showAddCategoryDialog) {
+        AddCategoryDialog(
+            initialType = if (selectedTypeFilter == "INCOME") "INCOME" else "EXPENSE",
+            onDismiss = { showAddCategoryDialog = false },
+            onSave = { name, type, iconName, colorHex ->
+                viewModel?.addCustomCategory(name, type, iconName, colorHex) { success, errorMsg ->
+                    if (success) {
+                        showAddCategoryDialog = false
+                        Toast.makeText(context, "Added category '$name' successfully!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, errorMsg ?: "Failed to add category", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        )
+    }
+
+    if (categoryToDelete != null) {
+        val cat = categoryToDelete!!
+        AlertDialog(
+            onDismissRequest = { categoryToDelete = null },
+            title = { Text("Delete Category?") },
+            text = {
+                Text("Are you sure you want to delete custom category '${cat.name}'? Existing transactions will keep their records.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel?.deleteCustomCategory(cat.id)
+                        categoryToDelete = null
+                        Toast.makeText(context, "Deleted '${cat.name}'", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { categoryToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun CategoryRowItem(
+    category: CategoryEntity,
+    onDelete: () -> Unit
+) {
+    val icon = remember(category.iconName) {
+        CategoryIconHelper.getIconByName(category.iconName)
+    }
+    val color = remember(category.colorHex) {
+        CategoryIconHelper.parseColor(category.colorHex)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = color.copy(alpha = 0.15f),
+            modifier = Modifier.size(40.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = category.name,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                if (category.isCustom) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                    ) {
+                        Text(
+                            text = "Custom",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = if (category.type == "EXPENSE") "Expense Tag" else "Income Tag",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (category.isCustom) {
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete Category",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }
@@ -1055,7 +1526,7 @@ fun AboutPage(
             )
 
             Text(
-                text = "Version 1.0.0",
+                text = "Version ${com.example.BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

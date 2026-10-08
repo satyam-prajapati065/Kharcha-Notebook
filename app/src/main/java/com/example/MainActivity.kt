@@ -27,7 +27,11 @@ class MainActivity : ComponentActivity() {
 
   private val viewModel: KharchaViewModel by viewModels {
     val database = KharchaDatabase.getDatabase(applicationContext)
-    val repository = KharchaRepository(database.transactionDao(), database.budgetDao())
+    val repository = KharchaRepository(
+      database.transactionDao(),
+      database.budgetDao(),
+      database.categoryDao()
+    )
     KharchaViewModelFactory(repository)
   }
 

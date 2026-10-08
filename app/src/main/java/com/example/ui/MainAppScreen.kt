@@ -25,8 +25,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ReceiptLong
@@ -74,6 +76,7 @@ import com.example.notifications.KharchaNotificationScheduler
 import com.example.ui.components.CurrencyFormatter
 import com.example.ui.dialogs.AddBudgetDialog
 import com.example.ui.dialogs.AddTransactionDialog
+import com.example.ui.dialogs.AiVoiceAssistantDialog
 import com.example.ui.dialogs.EditTransactionDialog
 import com.example.ui.dialogs.TransactionDetailDialog
 import com.example.ui.screens.AnalyticsScreen
@@ -310,6 +313,7 @@ fun MainDashboard(
     var selectedTab by remember { mutableIntStateOf(0) }
 
     // Dialog States
+    var showAiVoiceDialog by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
     var addDialogInitialType by remember { mutableStateOf("OUT") }
     var showAddBudgetDialog by remember { mutableStateOf(false) }
@@ -331,6 +335,15 @@ fun MainDashboard(
     val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
     val categorySpends by viewModel.expenseCategoryBreakdown.collectAsStateWithLifecycle()
     val budgets by viewModel.budgetProgress.collectAsStateWithLifecycle()
+    val expenseCategoryEntities by viewModel.expenseCategories.collectAsStateWithLifecycle()
+    val incomeCategoryEntities by viewModel.incomeCategories.collectAsStateWithLifecycle()
+
+    val expenseCategoryNames = remember(expenseCategoryEntities) {
+        expenseCategoryEntities.map { it.name }
+    }
+    val incomeCategoryNames = remember(incomeCategoryEntities) {
+        incomeCategoryEntities.map { it.name }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -406,21 +419,42 @@ fun MainDashboard(
         },
         floatingActionButton = {
             if (selectedTab != 4) {
-                FloatingActionButton(
-                    onClick = {
-                        addDialogInitialType = "OUT"
-                        showAddDialog = true
-                    },
-                    shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White,
-                    modifier = Modifier.testTag("main_add_fab")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add Transaction",
-                        modifier = Modifier.size(26.dp)
-                    )
+                    // AI Voice Assistant FAB
+                    FloatingActionButton(
+                        onClick = { showAiVoiceDialog = true },
+                        shape = CircleShape,
+                        containerColor = Color(0xFF6366F1),
+                        contentColor = Color.White,
+                        modifier = Modifier.testTag("main_ai_voice_fab")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "AI Voice Entry",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    // Quick Add FAB
+                    FloatingActionButton(
+                        onClick = {
+                            addDialogInitialType = "OUT"
+                            showAddDialog = true
+                        },
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White,
+                        modifier = Modifier.testTag("main_add_fab")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Transaction",
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
                 }
             }
         }
@@ -452,7 +486,8 @@ fun MainDashboard(
                     onSeeAllTransactions = { selectedTab = 1 },
                     onTransactionClick = { item -> detailTransaction = item },
                     onOpenProfile = { selectedTab = 4 },
-                    onOpenBudgets = { selectedTab = 3 }
+                    onOpenBudgets = { selectedTab = 3 },
+                    onOpenAiAssistant = { showAiVoiceDialog = true }
                 )
 
                 1 -> TransactionsScreen(
@@ -492,6 +527,7 @@ fun MainDashboard(
                 )
 
                 4 -> ProfileScreen(
+                    viewModel = viewModel,
                     userPreferencesManager = userPreferencesManager,
                     onBack = { selectedTab = 0 },
                     onNavigateToBudget = { selectedTab = 3 }
@@ -500,10 +536,17 @@ fun MainDashboard(
         }
     }
 
-    // Add Transaction Dialog with Calendar DatePicker
+    // Add Transaction Dialog with Calendar DatePicker & Custom Category Picker
     if (showAddDialog) {
         AddTransactionDialog(
             initialType = addDialogInitialType,
+            availableExpenseCategories = expenseCategoryNames,
+            availableIncomeCategories = incomeCategoryNames,
+            availableExpenseCategoryEntities = expenseCategoryEntities,
+            availableIncomeCategoryEntities = incomeCategoryEntities,
+            onAddCustomCategory = { name, type, iconName, colorHex, onResult ->
+                viewModel.addCustomCategory(name, type, iconName, colorHex, onResult)
+            },
             onDismiss = { showAddDialog = false },
             onSave = { type, amount, category, paymentMode, note, dateMillis ->
                 viewModel.addTransaction(
@@ -518,10 +561,17 @@ fun MainDashboard(
         )
     }
 
-    // Edit Transaction Dialog with Calendar DatePicker
+    // Edit Transaction Dialog with Calendar DatePicker & Custom Category Picker
     editTransaction?.let { txn ->
         EditTransactionDialog(
             transaction = txn,
+            availableExpenseCategories = expenseCategoryNames,
+            availableIncomeCategories = incomeCategoryNames,
+            availableExpenseCategoryEntities = expenseCategoryEntities,
+            availableIncomeCategoryEntities = incomeCategoryEntities,
+            onAddCustomCategory = { name, type, iconName, colorHex, onResult ->
+                viewModel.addCustomCategory(name, type, iconName, colorHex, onResult)
+            },
             onDismiss = { editTransaction = null },
             onSave = { updated ->
                 viewModel.updateTransaction(updated)
@@ -535,6 +585,7 @@ fun MainDashboard(
             budgets.associate { it.category to it.limit }
         }
         AddBudgetDialog(
+            availableCategories = expenseCategoryNames,
             onDismiss = {
                 showAddBudgetDialog = false
                 selectedBudgetCategoryForDialog = null
@@ -556,6 +607,27 @@ fun MainDashboard(
                 editTransaction = toEdit
             },
             onDelete = { id -> viewModel.deleteTransaction(id) }
+        )
+    }
+
+    // AI Voice Assistant Dialog
+    if (showAiVoiceDialog) {
+        AiVoiceAssistantDialog(
+            expenseCategories = expenseCategoryNames,
+            incomeCategories = incomeCategoryNames,
+            onDismiss = { showAiVoiceDialog = false },
+            onSaveTransaction = { type, amount, category, paymentMode, note ->
+                viewModel.addTransaction(
+                    type = type,
+                    amount = amount,
+                    category = category,
+                    paymentMode = paymentMode,
+                    note = note
+                )
+            },
+            onSetBudget = { category, limit ->
+                viewModel.setBudget(category, limit)
+            }
         )
     }
 }

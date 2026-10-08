@@ -133,8 +133,15 @@ fun formatDate(millis: Long): String {
     return sdf.format(Date(millis))
 }
 
-fun getCategoryIcon(category: String): ImageVector {
-    return when (category.lowercase()) {
+fun getCategoryIcon(category: String, explicitIconName: String? = null): ImageVector {
+    if (!explicitIconName.isNullOrBlank()) {
+        return CategoryIconHelper.getIconByName(explicitIconName)
+    }
+    val registeredIcon = CategoryIconHelper.getCustomIconName(category)
+    if (!registeredIcon.isNullOrBlank()) {
+        return CategoryIconHelper.getIconByName(registeredIcon)
+    }
+    return when (category.lowercase().trim()) {
         "salary" -> Icons.Default.Work
         "freelance", "business" -> Icons.Default.Laptop
         "rent" -> Icons.Default.ReceiptLong
@@ -144,12 +151,24 @@ fun getCategoryIcon(category: String): ImageVector {
         "bills & utilities", "bills" -> Icons.Default.ReceiptLong
         "transport" -> Icons.Default.DirectionsCar
         "health" -> Icons.Default.LocalHospital
-        else -> Icons.Default.MoreHoriz
+        else -> CategoryIconHelper.getIconByName(category)
     }
 }
 
-fun getCategoryColor(category: String): Color {
-    return when (category.lowercase()) {
+fun getCategoryColor(category: String, explicitColorHex: String? = null): Color {
+    if (!explicitColorHex.isNullOrBlank()) {
+        return CategoryIconHelper.parseColor(explicitColorHex)
+    }
+    val registeredColor = CategoryIconHelper.getCustomColorHex(category)
+    if (!registeredColor.isNullOrBlank()) {
+        return CategoryIconHelper.parseColor(registeredColor)
+    }
+
+    val hash = category.trim().lowercase().hashCode()
+    val fallbackColors = CategoryIconHelper.PRESET_COLORS
+    val fallbackColor = fallbackColors[Math.abs(hash) % fallbackColors.size].color
+
+    return when (category.lowercase().trim()) {
         "salary" -> Color(0xFF10B981)
         "freelance" -> Color(0xFF06B6D4)
         "business" -> Color(0xFF3B82F6)
@@ -160,7 +179,7 @@ fun getCategoryColor(category: String): Color {
         "bills & utilities", "bills" -> Color(0xFFEAB308)
         "transport" -> Color(0xFF3B82F6)
         "health" -> Color(0xFFEF4444)
-        else -> Color(0xFF64748B)
+        else -> fallbackColor
     }
 }
 

@@ -13,6 +13,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY dateMillis DESC")
     fun getAllTransactions(): Flow<List<TransactionEntity>>
 
+    @Query("SELECT * FROM transactions ORDER BY dateMillis DESC")
+    suspend fun getAllTransactionsList(): List<TransactionEntity>
+
     @Query("SELECT * FROM transactions WHERE monthYear = :monthYear ORDER BY dateMillis DESC")
     fun getTransactionsByMonth(monthYear: String): Flow<List<TransactionEntity>>
 

@@ -1,6 +1,8 @@
 package com.example.ui.dialogs
 
 import android.app.DatePickerDialog
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
@@ -50,6 +53,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.data.CategoryEntity
+import com.example.ui.components.CategoryIconHelper
+import com.example.ui.components.getCategoryColor
 import com.example.ui.components.getCategoryIcon
 import com.example.ui.theme.CashInGreen
 import com.example.ui.theme.CashInGreenBg
@@ -60,27 +66,90 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+data class TransactionCategoryUiItem(
+    val name: String,
+    val iconName: String? = null,
+    val colorHex: String? = null,
+    val isCustom: Boolean = false
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddTransactionDialog(
     initialType: String = "OUT", // "IN" or "OUT"
+    availableExpenseCategories: List<String> = emptyList(),
+    availableIncomeCategories: List<String> = emptyList(),
+    availableExpenseCategoryEntities: List<CategoryEntity> = emptyList(),
+    availableIncomeCategoryEntities: List<CategoryEntity> = emptyList(),
+    onAddCustomCategory: ((name: String, type: String, iconName: String, colorHex: String, onResult: (Boolean, String?) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit,
     onSave: (type: String, amount: Double, category: String, paymentMode: String, note: String, dateMillis: Long) -> Unit
 ) {
     val context = LocalContext.current
-    var type by remember { mutableStateOf(initialType) }
+    var type by remember(initialType) { mutableStateOf(initialType) }
     var amountText by remember { mutableStateOf("") }
     var noteText by remember { mutableStateOf("") }
     var selectedDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var showAddCategoryModal by remember { mutableStateOf(false) }
 
-    val inCategories = listOf("Salary", "Freelance", "Business", "Investments", "Gifts", "Other Income")
-    val outCategories = listOf(
-        "Food & Dining", "Groceries", "Rent", "Bills & Utilities",
-        "Shopping", "Transport", "Health", "Entertainment", "Education", "Others"
-    )
+    val defaultInCategories = remember {
+        listOf(
+            TransactionCategoryUiItem("Salary", "Work", "#10B981", false),
+            TransactionCategoryUiItem("Freelance", "Laptop", "#06B6D4", false),
+            TransactionCategoryUiItem("Business", "ShoppingBag", "#3B82F6", false),
+            TransactionCategoryUiItem("Investments", "TrendingUp", "#059669", false),
+            TransactionCategoryUiItem("Gifts", "CardGiftcard", "#EC4899", false),
+            TransactionCategoryUiItem("Other Income", "Category", "#64748B", false)
+        )
+    }
+
+    val defaultOutCategories = remember {
+        listOf(
+            TransactionCategoryUiItem("Food & Dining", "Restaurant", "#F97316", false),
+            TransactionCategoryUiItem("Groceries", "ShoppingBasket", "#14B8A6", false),
+            TransactionCategoryUiItem("Rent", "Home", "#8B5CF6", false),
+            TransactionCategoryUiItem("Bills & Utilities", "ReceiptLong", "#EAB308", false),
+            TransactionCategoryUiItem("Shopping", "ShoppingCart", "#EC4899", false),
+            TransactionCategoryUiItem("Transport", "DirectionsCar", "#3B82F6", false),
+            TransactionCategoryUiItem("Health", "LocalHospital", "#EF4444", false),
+            TransactionCategoryUiItem("Entertainment", "Theaters", "#A855F7", false),
+            TransactionCategoryUiItem("Education", "School", "#6366F1", false),
+            TransactionCategoryUiItem("Other Expense", "Category", "#64748B", false)
+        )
+    }
+
+    val inCategories = remember(availableIncomeCategoryEntities, availableIncomeCategories) {
+        if (availableIncomeCategoryEntities.isNotEmpty()) {
+            availableIncomeCategoryEntities.map {
+                TransactionCategoryUiItem(it.name, it.iconName, it.colorHex, it.isCustom)
+            }
+        } else if (availableIncomeCategories.isNotEmpty()) {
+            availableIncomeCategories.map {
+                TransactionCategoryUiItem(it, null, null, false)
+            }
+        } else {
+            defaultInCategories
+        }
+    }
+
+    val outCategories = remember(availableExpenseCategoryEntities, availableExpenseCategories) {
+        if (availableExpenseCategoryEntities.isNotEmpty()) {
+            availableExpenseCategoryEntities.map {
+                TransactionCategoryUiItem(it.name, it.iconName, it.colorHex, it.isCustom)
+            }
+        } else if (availableExpenseCategories.isNotEmpty()) {
+            availableExpenseCategories.map {
+                TransactionCategoryUiItem(it, null, null, false)
+            }
+        } else {
+            defaultOutCategories
+        }
+    }
 
     val currentCategories = if (type == "IN") inCategories else outCategories
-    var selectedCategory by remember(type) { mutableStateOf(currentCategories.first()) }
+    var selectedCategory by remember(type, currentCategories) {
+        mutableStateOf(currentCategories.firstOrNull()?.name ?: "Other Expense")
+    }
     val paymentModes = listOf("UPI", "Cash", "Bank", "Card")
     var selectedPaymentMode by remember { mutableStateOf("UPI") }
 
@@ -136,7 +205,7 @@ fun AddTransactionDialog(
                             .background(if (type == "IN") CashInGreen else Color.Transparent)
                             .clickable {
                                 type = "IN"
-                                selectedCategory = inCategories.first()
+                                selectedCategory = inCategories.firstOrNull()?.name ?: "Salary"
                             }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
@@ -165,7 +234,7 @@ fun AddTransactionDialog(
                             .background(if (type == "OUT") CashOutRed else Color.Transparent)
                             .clickable {
                                 type = "OUT"
-                                selectedCategory = outCategories.first()
+                                selectedCategory = outCategories.firstOrNull()?.name ?: "Food & Dining"
                             }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
@@ -219,23 +288,31 @@ fun AddTransactionDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf("100", "500", "1000", "2000").forEach { quickAmount ->
+                        val isSelected = amountText.trim() == quickAmount
+                        val activeBorder = if (type == "IN") CashInGreen else CashOutRed
+                        val activeBg = if (type == "IN") CashInGreenBg else CashOutRedBg
+
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) activeBg else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = if (isSelected) BorderStroke(1.5.dp, activeBorder) else BorderStroke(1.dp, Color.Transparent),
                             modifier = Modifier
                                 .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable {
-                                    val current = amountText.toDoubleOrNull() ?: 0.0
-                                    val added = quickAmount.toDouble()
-                                    amountText = (current + added).toInt().toString()
+                                    // Direct replacement instead of cumulative addition; toggle to empty if tapped again
+                                    amountText = if (amountText.trim() == quickAmount) "" else quickAmount
                                 }
+                                .testTag("quick_amount_$quickAmount")
                         ) {
                             Text(
-                                text = "+₹$quickAmount",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                modifier = Modifier.padding(vertical = 6.dp),
+                                text = "₹$quickAmount",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
+                                ),
+                                modifier = Modifier.padding(vertical = 8.dp),
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (isSelected) activeBorder else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -243,9 +320,9 @@ fun AddTransactionDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Category Selection
+                // Category Selection Header
                 Text(
-                    text = "Select Category",
+                    text = if (type == "IN") "Select Income Category" else "Select Expense Category",
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -256,37 +333,77 @@ fun AddTransactionDialog(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    currentCategories.forEach { category ->
-                        val isSelected = selectedCategory == category
+                    currentCategories.forEach { catItem ->
+                        val isSelected = selectedCategory == catItem.name
                         val activeBg = if (type == "IN") CashInGreenBg else CashOutRedBg
                         val activeBorder = if (type == "IN") CashInGreen else CashOutRed
-                        val icon = getCategoryIcon(category)
+                        val icon = getCategoryIcon(catItem.name, catItem.iconName)
+                        val customColor = catItem.colorHex?.let { CategoryIconHelper.parseColor(it) } ?: getCategoryColor(catItem.name)
 
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = if (isSelected) activeBg else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                            border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, activeBorder) else null,
-                            modifier = Modifier.clickable { selectedCategory = category }
+                            border = if (isSelected) BorderStroke(1.5.dp, activeBorder) else if (catItem.isCustom) BorderStroke(1.dp, customColor.copy(alpha = 0.5f)) else null,
+                            modifier = Modifier.clickable { selectedCategory = catItem.name }
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
                             ) {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = null,
-                                    tint = if (isSelected) activeBorder else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(if (catItem.isCustom) customColor.copy(alpha = 0.15f) else Color.Transparent),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = if (isSelected) activeBorder else if (catItem.isCustom) customColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = category,
+                                    text = catItem.name,
                                     style = MaterialTheme.typography.bodySmall.copy(
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     ),
                                     color = if (isSelected) activeBorder else MaterialTheme.colorScheme.onSurface
                                 )
                             }
+                        }
+                    }
+
+                    // Direct Inline "+ Add Category" Chip
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = (if (type == "IN") CashInGreen else CashOutRed).copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, (if (type == "IN") CashInGreen else CashOutRed).copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { showAddCategoryModal = true }
+                            .testTag("add_category_flow_chip")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AddCircle,
+                                contentDescription = "Add Category",
+                                tint = if (type == "IN") CashInGreen else CashOutRed,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "+ Add Category",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = if (type == "IN") CashInGreen else CashOutRed
+                            )
                         }
                     }
                 }
@@ -338,7 +455,7 @@ fun AddTransactionDialog(
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
@@ -360,16 +477,18 @@ fun AddTransactionDialog(
                         }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.CalendarToday,
-                                contentDescription = "Calendar",
+                                contentDescription = "Pick Date",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
@@ -409,7 +528,8 @@ fun AddTransactionDialog(
                     onClick = {
                         val amount = amountText.toDoubleOrNull() ?: 0.0
                         if (amount > 0) {
-                            onSave(type, amount, selectedCategory, selectedPaymentMode, noteText.trim(), selectedDateMillis)
+                            val categoryToSave = if (selectedCategory.isNotBlank()) selectedCategory else (currentCategories.firstOrNull()?.name ?: "Other Expense")
+                            onSave(type, amount, categoryToSave, selectedPaymentMode, noteText.trim(), selectedDateMillis)
                             onDismiss()
                         }
                     },
@@ -431,5 +551,28 @@ fun AddTransactionDialog(
                 }
             }
         }
+    }
+
+    if (showAddCategoryModal) {
+        AddCategoryDialog(
+            initialType = if (type == "IN") "INCOME" else "EXPENSE",
+            onDismiss = { showAddCategoryModal = false },
+            onSave = { catName, catType, iconName, colorHex ->
+                if (onAddCustomCategory != null) {
+                    onAddCustomCategory(catName, catType, iconName, colorHex) { success, errorMsg ->
+                        if (success) {
+                            selectedCategory = catName
+                            showAddCategoryModal = false
+                            Toast.makeText(context, "Added '$catName' to ${if (catType == "INCOME") "Income" else "Expense"} categories!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, errorMsg ?: "Could not add category", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                } else {
+                    selectedCategory = catName
+                    showAddCategoryModal = false
+                }
+            }
+        )
     }
 }

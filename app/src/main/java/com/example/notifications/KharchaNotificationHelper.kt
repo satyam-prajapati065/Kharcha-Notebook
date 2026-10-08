@@ -19,7 +19,6 @@ object KharchaNotificationHelper {
 
     const val NOTIFICATION_ID_DAILY = 1001
     const val NOTIFICATION_ID_MONTHLY = 1002
-    const val NOTIFICATION_ID_TEST = 1003
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -105,15 +104,6 @@ object KharchaNotificationHelper {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_MONTHLY, notification)
         } catch (e: SecurityException) {
             e.printStackTrace()
-        }
-    }
-
-    fun sendTestReminder(context: Context, isMonthly: Boolean = false) {
-        createNotificationChannel(context)
-        if (isMonthly) {
-            sendMonthlyReminder(context)
-        } else {
-            sendDailyReminder(context)
         }
     }
 }
